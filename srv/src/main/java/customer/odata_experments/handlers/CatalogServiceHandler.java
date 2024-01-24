@@ -1,8 +1,14 @@
 package customer.odata_experments.handlers;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.sap.cds.ql.cqn.CqnPlain;
+import com.sap.cds.ql.cqn.CqnToken;
+import com.sap.cds.services.ErrorStatuses;
+import com.sap.cds.services.ServiceException;
 import org.springframework.stereotype.Component;
 
 import com.sap.cds.ql.cqn.CqnAnalyzer;
@@ -25,15 +31,22 @@ public class CatalogServiceHandler implements EventHandler {
 
 	@Before(event = CqnService.EVENT_READ)
 	public void beforeHandler(CdsReadEventContext context) {
-		CdsModel model = context.getModel();
-		CqnAnalyzer cqnAnalyzer = CqnAnalyzer.create(model);
-		
 		Optional<CqnPredicate> whereClauseOptional = context.getCqn().where();
 		if (whereClauseOptional.isPresent()) {
-			CqnPredicate whereClause = whereClauseOptional.get();
-			var a = 5;
-			// whereClause.
+			List<CqnToken> tokens = whereClauseOptional.get().tokens().toList();
+
+			if (containsLtOrGt(tokens)) {
+				throw new ServiceException(ErrorStatuses.BAD_REQUEST, "Server does not accept filters including LT or GT");
+			}
 		}
+	}
+
+	private boolean containsLtOrGt(List<CqnToken> tokens) {
+		return tokens.stream()
+				.filter(token -> token instanceof CqnPlain)
+				.map(token -> (CqnPlain) token)
+				.map(CqnPlain::plain)
+				.anyMatch(token -> token.equals("<") || token.equals(">"));
 	}
 
 	@After(event = CqnService.EVENT_READ)
